@@ -146,6 +146,54 @@ variable "db_proxy_endpoints" {
   default     = {}
 }
 
+# Security Group
+# Creates a custom security group and attaches it to the proxy and all proxy endpoints
+variable "security_group_egress" {
+  description = "Map of Security Group egress rules"
+  type        = any
+  default     = {}
+  # The following keys are allowed in each rule,
+  #   description = string (default 'null')
+  #   from_port   = number (default 0)
+  #   to_port     = number (default 65535)
+  #   protocol    = string (default "tcp")
+  # The following options are mutually exclusive. Choose only one of cidr_blocks/ipv6_cidr_blocks, self, or
+  # source_security_group_id:
+  #   cidr_blocks              = list(string)
+  #   ipv6_cidr_blocks         = list(string)
+  #   self                     = boot
+  #   source_security_group_id = string
+}
+
+variable "security_group_ingress" {
+  description = "Map of Security Group ingress rules"
+  type        = any
+  default     = {}
+  # The following keys are allowed in each rule,
+  #   description = string (default 'null')
+  #   from_port   = number (default 0)
+  #   to_port     = number (default 65535)
+  #   protocol    = string (default "tcp")
+  # The following options are mutually exclusive. Choose only one of cidr_blocks/ipv6_cidr_blocks, self, or
+  # source_security_group_id:
+  #   cidr_blocks              = list(string)
+  #   ipv6_cidr_blocks         = list(string)
+  #   self                     = boot
+  #   source_security_group_id = string
+}
+
+variable "security_group_tags" {
+  description = "A map of tags to apply to the Security Group"
+  type        = map(string)
+  default     = {}
+}
+
+variable "security_group_vpc_id" {
+  description = "VPC ID for Security Group. Only used if var.security_group_egress or var.security_group_ingress is set."
+  type        = string
+  default     = null
+}
+
 # CloudWatch Logs
 variable "manage_log_group" {
   description = "Determines whether Terraform will create/manage the CloudWatch log group or not. Note - this will fail if set to true after the log group has been created as the resource will already exist"

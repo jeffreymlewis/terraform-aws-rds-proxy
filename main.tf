@@ -19,7 +19,7 @@ resource "aws_db_proxy" "this" {
   idle_client_timeout    = var.idle_client_timeout
   require_tls            = var.require_tls
   role_arn               = local.role_arn
-  vpc_security_group_ids = var.vpc_security_group_ids
+  vpc_security_group_ids = concat(var.vpc_security_group_ids, local.security_group_ids)
   vpc_subnet_ids         = var.vpc_subnet_ids
 
   dynamic "auth" {
@@ -73,10 +73,66 @@ resource "aws_db_proxy_endpoint" "this" {
   db_proxy_name          = aws_db_proxy.this[0].name
   db_proxy_endpoint_name = each.value.name
   vpc_subnet_ids         = each.value.vpc_subnet_ids
-  vpc_security_group_ids = lookup(each.value, "vpc_security_group_ids", null)
+  vpc_security_group_ids = concat(lookup(each.value, "vpc_security_group_ids", []), local.security_group_ids)
   target_role            = lookup(each.value, "target_role", null)
 
   tags = lookup(each.value, "tags", var.tags)
+}
+
+################################################################################
+# Security Group
+# Optionally create a security group for the proxy and all custom endpoints
+################################################################################
+resource "aws_security_group" "this" {
+  count = local.create_security_group ? 1 : 0
+
+  name_prefix = var.name
+  description = "Allow ingress and egress for RDS Proxy ${var.name}"
+  vpc_id      = var.security_group_vpc_id
+
+  tags = merge(var.tags, var.security_group_tags)
+}
+
+resource "aws_security_group_rule" "ingress" {
+  for_each = local.create_security_group ? var.security_group_ingress : {}
+
+  type        = "ingress"
+  description = lookup(each.value, "description", null)
+  from_port   = lookup(each.value, "from_port", local.default_security_group_port)
+  to_port     = lookup(each.value, "to_port", local.default_security_group_port)
+  protocol    = lookup(each.value, "protocol", "tcp")
+
+  cidr_blocks              = lookup(each.value, "cidr_blocks", null)
+  ipv6_cidr_blocks         = lookup(each.value, "ipv6_cidr_blocks", null)
+  self                     = lookup(each.value, "self", null)
+  source_security_group_id = lookup(each.value, "source_security_group_id", null)
+
+  security_group_id = aws_security_group.this[0].id
+}
+
+resource "aws_security_group_rule" "egress" {
+  for_each = local.create_security_group ? var.security_group_egress : {}
+
+  type        = "egress"
+  description = lookup(each.value, "description", null)
+  from_port   = lookup(each.value, "from_port", local.default_security_group_port)
+  to_port     = lookup(each.value, "to_port", local.default_security_group_port)
+  protocol    = lookup(each.value, "protocol", "tcp")
+
+  cidr_blocks              = lookup(each.value, "cidr_blocks", null)
+  ipv6_cidr_blocks         = lookup(each.value, "ipv6_cidr_blocks", null)
+  self                     = lookup(each.value, "self", null)
+  source_security_group_id = lookup(each.value, "source_security_group_id", null)
+
+  security_group_id = aws_security_group.this[0].id
+}
+
+locals {
+  # Default values for security group creation
+  create_security_group       = var.create_proxy && var.security_group_vpc_id != null
+  default_security_group_port = var.engine_family == "MYSQL" ? 3306 : 5432
+
+  security_group_ids = local.create_security_group ? [aws_security_group.this[0].id] : []
 }
 
 ################################################################################
